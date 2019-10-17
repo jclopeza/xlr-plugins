@@ -9,12 +9,8 @@
         <property name="iconLocation" default="artifactory/artifactory.png" hidden="true"/>
         <property name="artifactoryServer" category="input" label="Server" referenced-type="artifactory.ArtifactoryServer" kind="ci" required="true"/>
         <property name="endPoint" category="input" label="Endpoint" default ="/service/rest/v1/repositories" required="true"/>
-
+        <!-- Variables de salida -->
         <property name="listArtifacts" category="output"/>
-    </type>
-
-    <type type="test.TestValueProvider" extends="xlrelease.JythonProvider" label="Artifactory repositories"
-          description="Repositories availables">
     </type>
 
 </synthetic>

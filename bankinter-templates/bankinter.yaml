@@ -1,0 +1,1178 @@
+---
+apiVersion: xl-release/v1
+kind: Templates
+spec:
+- directory: Workshop
+  children:
+  - directory: Bankinter
+    children:
+    - name: Artifactory Value Provider
+      type: artifactoryValueProvider.ArtifactoryServer
+      url: http://localhost:8081/artifactory
+      authenticationMethod: Basic
+      username: admin
+      password: !value "artifactoryValueProvider_ArtifactoryServer_Artifactory_Value_Provider_password"
+    - name: CA Release Automation Server
+      type: nolio.Server
+      url: http://localhost
+    - name: bankinter
+      type: xlrelease.GitHubScmConnectorConfig
+      repository: jclopeza/bankinter
+      credential:
+        type: xlrelease.GitHubOAuth2Token
+        token: !value "xlrelease_GitHubOAuth2Token_token"
+    - name: jclopeza\/bankinter
+      type: git.Repository
+      url: https://github.com/jclopeza/bankinter
+    - template: 4.1 Permitir al desarrollador generar paquetes de artefactos de distintas
+        tipologías (java, javascript, cobol, css, .pck ..) y coordinar su despliegue.
+      description: |-
+        ### 4.1 Permitir al desarrollador generar paquetes de artefactos de distintas tipologías (java, javascript, cobol, css, .pck ..) y coordinar su despliegue.
+
+        XL Release permite, mediante la creación y diseño de templates, modelizar las actividades necesarias para la construcción, publicación, identificación y despliegue de software de distintas tecnologías y a distintos entornos. Gracias a los plugins que proporciona 'out-of-the-box', a los plugins desarrollados por la comunidad y a la posibilidad de extender y crear plugins personalizados, se integra con todas las herramientas necesarias para modelizar el flujo de trabajo que se desee.
+        Para poder generar paquetes de artefactos de distintas tipologías se podrían utilizar las integraciones con herramientas como BitBucket, Jenkins, Jira, y los tipos de tareas que permiten ejecutar scripts en remoto y hacer invocaciones API-REST a sistemas externos.
+        En la siguiente imagen vemos un ejemplo de cómo secuenciar varias actividades relacionadas con BitBucket, Jenkins y Jira.
+      scheduledStartDate: 2019-10-16T09:00:00+02:00
+      phases:
+      - phase: GESTIÓN DEL CÓDIGO FUENTE
+        tasks:
+        - name: Create Pull Request
+          type: bitbucket.CreatePullRequest
+          description: Creación de pull request para incluir en la rama principal
+            de desarrollo el nuevo código generado
+          team: Desarrollo
+        - name: Wait For Merge
+          type: bitbucket.WaitForMerge
+          description: Esperando para revisión del código fuente
+          team: Desarrollo
+        - name: Actualizar feature en Jira
+          type: jira.UpdateIssue
+        color: '#0099CC'
+      - phase: CONSTRUCCIÓN DEL SOFTWARE
+        tasks:
+        - name: Compilación .pck
+          type: remoteScript.Unix
+        - name: Compilación cobol
+          type: endevor.CreatePackage
+        - name: Compilación java
+          type: jenkins.Build
+        color: '#08B153'
+      - phase: CREAR DEPLOYMENT PLAN
+        tasks:
+        - name: Lista de versiones disponibles
+          type: artifactory.ArtifactoryQuery
+        - name: Selección de versión a desplegar
+          type: xlrelease.UserInputTask
+          description: Please enter the required information below.
+        - name: Creación Deployment Plan
+          type: nolio.createDeploymentPlan
+        - name: Aprobación pase a DEV
+          type: xlrelease.GateTask
+        color: '#FD8D10'
+      - phase: DESPLIEGUE A DEV
+        tasks:
+        - name: Notificación Teams actualización versión
+          type: msteams.Notification
+        - name: Despliegue versión entorno DEV
+          type: nolio.runDeployment
+        - name: Ejecución pruebas manuales
+          type: xlrelease.Task
+        - name: Aprobación pase a PRE
+          type: xlrelease.GateTask
+        color: '#D94C3D'
+      riskProfile: Default risk profile
+    - template: 4.10 Validación de que el usuario está autorizado a desplegar - posible
+        integración con RA
+      scheduledStartDate: 2019-10-17T09:00:00+02:00
+      phases:
+      - phase: BUILD
+        color: '#0099CC'
+      - phase: TEST
+        color: '#999999'
+      - phase: PREPRODUCCIÓN
+        tasks:
+        - name: Credenciales para el despliegue en PRE
+          type: xlrelease.UserInputTask
+          description: Please enter the required information below.
+          team: Desarrollo
+          variables:
+          - user
+          - password
+        - name: Despliegue en PRE
+          type: nolio.runDeployment
+          nolioServer: CA Release Automation Server
+          username: ${user}
+          variableMapping:
+            pythonScript.password: ${password}
+        color: '#08B153'
+      - phase: PRODUCCIÓN
+        tasks:
+        - name: Credenciales para el despliegue en PRO
+          type: xlrelease.UserInputTask
+          description: Please enter the required information below.
+          team: Operaciones
+          variables:
+          - user_pro
+          - password_pro
+        - name: Despliegue en PRO
+          type: nolio.runDeployment
+          nolioServer: CA Release Automation Server
+          username: ${user_pro}
+          variableMapping:
+            pythonScript.password: ${password_pro}
+        color: '#FD8D10'
+      variables:
+      - type: xlrelease.StringVariable
+        key: user
+        requiresValue: false
+        showOnReleaseStart: false
+        label: Usuario
+        description: Usuario para CA Release Automation
+      - type: xlrelease.PasswordStringVariable
+        key: password
+        requiresValue: false
+        showOnReleaseStart: false
+        label: Password
+        description: Password para CA Release Automation
+      - type: xlrelease.StringVariable
+        key: user_pro
+        requiresValue: false
+        showOnReleaseStart: false
+        label: Usuario
+        description: Usuario CA Release Automation
+      - type: xlrelease.PasswordStringVariable
+        key: password_pro
+        requiresValue: false
+        showOnReleaseStart: false
+        label: Password
+        description: Password CA Release Automation
+      riskProfile: Default risk profile
+    - template: 4.11 Validación del estado del artefacto antes de desplegar (por ejemplo
+        si está deprecado que no lo permita)
+      scheduledStartDate: 2019-10-17T09:00:00+02:00
+      phases:
+      - phase: SELECCIÓN DE ARTEFACTO
+        tasks:
+        - name: Selecciona repositorio
+          type: xlrelease.UserInputTask
+          description: Please enter the required information below.
+          owner: admin
+          variables:
+          - repository
+        - name: Selecciona artefacto
+          type: xlrelease.UserInputTask
+          description: Please enter the required information below.
+          owner: admin
+          variables:
+          - artifact
+        - name: Selecciona versión
+          type: xlrelease.UserInputTask
+          description: Please enter the required information below.
+          owner: admin
+          variables:
+          - version
+        color: '#991C71'
+      - phase: OBTENCIÓN DE PROPIEDADES
+        tasks:
+        - name: Obtención de propiedades
+          type: webhook.JsonWebhook
+          URL: http://localhost:8081/artifactory/api/storage/${repository}/${artifact}${version}?properties
+          username: admin
+          password: !value "webhook_JsonWebhook_Obtenci_n_de_propiedades_password"
+          jsonPathExpression: properties.deprecado[0]
+          owner: admin
+          variableMapping:
+            pythonScript.result: ${deprecado}
+        - name: ¿Está deprecado?
+          type: xlrelease.GateTask
+          description: |-
+            ### Artefacto deprecado!
+
+            Atención, el artefacto **${artifact}** en versión **${version}** seleccionado para el despliegue se encuentra **deprecado**.
+
+            ## Debería abortar la release o seleccionar otra versión
+          owner: admin
+          precondition: releaseVariables['deprecado'] == "true"
+        color: '#FD8D10'
+      - phase: DEPLOY
+        tasks:
+        - name: El artefacto seleccionado no está deprecado. Finalice esta tarea para
+            realizar el despliegue
+          type: xlrelease.Task
+        - name: Ejecución de Despliegue
+          type: nolio.runDeployment
+          nolioServer: CA Release Automation Server
+        color: '#08B153'
+      variables:
+      - type: xlrelease.StringVariable
+        key: repository
+        requiresValue: false
+        showOnReleaseStart: false
+        label: Repositorio
+        valueProvider:
+          type: artifactoryValueProvider.GetRepositories
+          artifactoryServer: Artifactory Value Provider
+      - type: xlrelease.StringVariable
+        key: version
+        requiresValue: false
+        showOnReleaseStart: false
+        label: Version
+        valueProvider:
+          type: artifactoryValueProvider.GetVersions
+          artifactoryServer: Artifactory Value Provider
+      - type: xlrelease.StringVariable
+        key: artifact
+        requiresValue: false
+        showOnReleaseStart: false
+        label: Artefacto
+        valueProvider:
+          type: xlrelease.ListOfStringValueProviderConfiguration
+          values:
+          - com/xebialabs/congruencias/webapp
+          - com/xebialabs/congruencias/webservices
+          - com/xebialabs/congruencias/javabdd
+          - com/xebialabs/congruencias/schemabdd
+        value: com/xebialabs/congruencias/webapp
+      - type: xlrelease.StringVariable
+        key: deprecado
+        requiresValue: false
+        showOnReleaseStart: false
+        label: Deprecado
+        value: "false"
+      scriptUsername: admin
+      scriptUserPassword: !value "xlrelease_Release_4_11_Validaci_n_del_estado_del_artefacto_antes_de_desplegar__por_ejemplo_si_est__deprecado_que_no_lo_permita__scriptUserPassword"
+      riskProfile: Default risk profile
+    - template: 4.2 Permitir establecer dependencias de despliegue entre los paquetes
+        o componentes unitarios. (1)
+      scheduledStartDate: 2019-10-16T09:00:00+02:00
+      phases:
+      - phase: DESARROLLO
+        tasks:
+        - name: Compilación
+          type: xlrelease.Task
+        - name: Ejecución test unitarios
+          type: xlrelease.Task
+        - name: Aprobación
+          type: xlrelease.Task
+        color: '#0099CC'
+      - phase: PRUEBAS
+        tasks:
+        - name: Pruebas cheking qa
+          type: xlrelease.Task
+        - name: Pruebas de performance
+          type: xlrelease.Task
+        - name: Aprobación
+          type: xlrelease.Task
+        color: '#08B153'
+      - phase: PREPRODUCCIÓN
+        tasks:
+        - name: Revisión versión liberada
+          type: xlrelease.Task
+        - name: Espera por dependencias
+          type: xlrelease.GateTask
+        - name: Despliegue a PRE
+          type: xlrelease.Task
+        - name: Ejecución pruebas de aceptación
+          type: xlrelease.Task
+        - name: Aprobación pase a PRO
+          type: xlrelease.Task
+        color: '#FD8D10'
+      - phase: PRODUCCIÓN
+        tasks:
+        - name: Reunión de lanzamiento
+          type: xlrelease.Task
+        - name: Espera por dependencias
+          type: xlrelease.GateTask
+        - name: Despliegue a PRO
+          type: xlrelease.Task
+        - name: Notificación
+          type: xlrelease.Task
+        color: '#D94C3D'
+      riskProfile: Default risk profile
+    - template: 4.2 Permitir establecer dependencias de despliegue entre los paquetes
+        o componentes unitarios. (2)
+      scheduledStartDate: 2019-10-16T09:00:00+02:00
+      phases:
+      - phase: DEPENDENCIAS
+        tasks:
+        - name: Obtener y establecer dependencias
+          type: xlrelease.ScriptTask
+          script: |-
+            import urllib2
+            import json
+            import base64
+            import time
+
+            id_dependencies = []
+            for key, val in ${dependencies}.items():
+                print("key = {0}".format(key))
+                print("val = {0}".format(val))
+                url = "http://localhost:5516/api/v1/releases/byTitle?releaseTitle={0}%20{1}".format(key, val)
+                req = urllib2.Request(url)
+                base64string = base64.b64encode("{0}:{1}".format('admin', '2001jcla'))
+                req.add_header("Authorization", "Basic %s" % base64string)
+                req.add_header('Content-Type','application/json')
+                microserviceFound = False
+                while not microserviceFound:
+                    response = urllib2.urlopen(req)
+                    data = json.load(response)
+                    print("Total de registros para microservicio {0} en version {1} = {2}".format(key, val, len(data)))
+                    if len(data) > 0:
+                        microserviceFound = True
+                        # Ahora debemos obtener el ID de la release
+                        id_release = data[0]["id"]
+                        id_dependencies = id_dependencies + [id_release]
+                        print("ID release = {0}".format(id_release))
+                    else:
+                        print("Microservice no encontrado, esperamos 5 segundos")
+                        time.sleep(5)
+
+            releaseVariables["id_dependencies"] = id_dependencies
+
+            # Obtenemos los IDs de las fases de los microservicios
+            id_phases = []
+            for id_dep in id_dependencies:
+                # Obtenemos el ID de la fase de los microservicios de los que depende este microservicio
+                # Como ejemplo tomamos como referencia la fase de nombre PRUEBAS
+                url = "http://localhost:5516/api/v1/phases/byTitle?phaseTitle=PRUEBAS&releaseId={0}".format(id_dep)
+                req = urllib2.Request(url)
+                base64string = base64.b64encode("{0}:{1}".format('admin', '2001jcla'))
+                req.add_header("Authorization", "Basic %s" % base64string)
+                req.add_header('Content-Type','application/json')
+                response = urllib2.urlopen(req)
+                data = json.load(response)
+                # Ahora debemos obtener el ID de la fase
+                id_phase = data[0]["id"]
+                id_phases = id_phases + [id_phase]
+                print("ID phase = {0}".format(id_phase))
+
+            releaseVariables["id_phases"] = id_phases
+
+            # Finalmente, modificamos el GATE de la release del microservicio e incluimos las dependencias de las fases
+            # Primero obtenemos el ID de la tarea de tipo GATE
+            url = "http://localhost:5516/api/v1/tasks/byTitle?taskTitle=Esperar%20por%20dependencias&phaseTitle=DEPENDENCIAS&releaseId={0}".format("${release.id}")
+            req = urllib2.Request(url)
+            base64string = base64.b64encode("{0}:{1}".format('admin', '2001jcla'))
+            req.add_header("Authorization", "Basic %s" % base64string)
+            req.add_header('Content-Type','application/json')
+            response = urllib2.urlopen(req)
+            data = json.load(response)
+            # Ahora debemos obtener el ID de la fase
+            id_task = data[0]["id"]
+            print("ID de tarea = {0}".format(id_task))
+
+            # Ahora modificamos la tarea y establecemos las dependencias
+            for id_phase in id_phases:
+                url = "http://localhost:5516/api/v1/tasks/{0}/dependencies/{1}".format(id_task, id_phase)
+                req = urllib2.Request(url)
+                base64string = base64.b64encode("{0}:{1}".format('admin', '2001jcla'))
+                req.add_header("Authorization", "Basic %s" % base64string)
+                req.add_header('Content-Type','application/json')
+                req.add_data({})
+                response = urllib2.urlopen(req)
+        - name: Esperar por dependencias
+          type: xlrelease.GateTask
+        color: '#0099CC'
+      variables:
+      - type: xlrelease.MapStringStringVariable
+        key: dependencies
+        label: Dependencias de microservicios
+        description: Establezca las dependencias de este microservicio con terceros
+        value:
+          microservicio2: "2.0"
+          microservicio3: "3.0"
+          microservicio1: "1.0"
+      - type: xlrelease.ListStringVariable
+        key: id_dependencies
+        requiresValue: false
+        showOnReleaseStart: false
+      - type: xlrelease.ListStringVariable
+        key: id_phases
+        requiresValue: false
+        showOnReleaseStart: false
+      scriptUsername: admin
+      scriptUserPassword: !value "xlrelease_Release_4_2_Permitir_establecer_dependencias_de_despliegue_entre_los_paquetes_o_componentes_unitarios___2__scriptUserPassword"
+      riskProfile: Default risk profile
+    - template: 4.2 Permitir establecer dependencias de despliegue entre los paquetes
+        o componentes unitarios. (3)
+      scheduledStartDate: 2019-10-16T09:00:00+02:00
+      phases:
+      - phase: GET DEPENDENCIES
+        tasks:
+        - name: Obtener dependencias de los microservicios
+          type: dependencies.GetDependencies
+          phaseName: PRUEBAS
+          variableMapping:
+            pythonScript.listIdsDependentPhases: ${id_phases}
+            pythonScript.dependencies: ${dependencies}
+            pythonScript.password: ${folder.xlrAdminPassword}
+        - name: Establecer dependencias
+          type: dependencies.SetDependencies
+          phaseName: WAIT FOR DEPENDENCIES
+          taskName: Esperar cumplimiento de dependencias
+          variableMapping:
+            pythonScript.listIdsDependentPhases: ${id_phases}
+            pythonScript.password: ${folder.xlrAdminPassword}
+        color: '#0099CC'
+      - phase: WAIT FOR DEPENDENCIES
+        tasks:
+        - name: Esperar cumplimiento de dependencias
+          type: xlrelease.GateTask
+        color: '#D94C3D'
+      variables:
+      - type: xlrelease.MapStringStringVariable
+        key: dependencies
+        label: Dependencias de microservicios
+        description: Establezca las dependencias de este microservicio con terceros
+        value:
+          microservicio2: "2.0"
+          microservicio3: "3.0"
+          microservicio1: "1.0"
+      - type: xlrelease.ListStringVariable
+        key: id_phases
+        requiresValue: false
+        showOnReleaseStart: false
+      scriptUsername: admin
+      scriptUserPassword: !value "xlrelease_Release_4_2_Permitir_establecer_dependencias_de_despliegue_entre_los_paquetes_o_componentes_unitarios___3__scriptUserPassword"
+      riskProfile: Default risk profile
+    - template: 4.3 Permitir conocer en todo momento las versiones de los artefactos
+        de cada entorno.
+      scheduledStartDate: 2019-10-16T09:00:00+02:00
+      phases:
+      - phase: DESPLIEGE
+        tasks:
+        - name: Despliegue
+          type: xlrelease.ScriptTask
+          facets:
+          - type: udm.DeploymentTaskFacet
+            variableMapping:
+              version: ${version}
+              applicationId: ${application}
+              environmentId: ${environment}
+          script: print("deploy")
+        color: '#0099CC'
+      variables:
+      - type: xlrelease.StringVariable
+        key: application
+        requiresValue: false
+        showOnReleaseStart: false
+        value: application
+      - type: xlrelease.StringVariable
+        key: version
+        requiresValue: false
+        showOnReleaseStart: false
+        value: version
+      - type: xlrelease.StringVariable
+        key: environment
+        requiresValue: false
+        showOnReleaseStart: false
+        value: environment
+      riskProfile: Default risk profile
+    - template: 4.4 Un paquete puede permanecer en un determinado entorno el tiempo
+        que sea necesario.
+      scheduledStartDate: 2019-10-16T09:00:00+02:00
+      phases:
+      - phase: DESPLIEGUE A DEV
+        tasks:
+        - name: Ejecución de despliegue a DEV
+          type: nolio.runDeployment
+        - name: Aprobación manual
+          type: xlrelease.Task
+        color: '#08B153'
+      - phase: DESPLIEGUE A TEST
+        tasks:
+        - name: Ejecución de despliegue a TEST
+          type: nolio.runDeployment
+        - name: Chequeo de estado en Remedy
+          type: remedy.pollingCheckStatus
+        color: '#0099CC'
+      - phase: DESPLIEGUE A PRE
+        tasks:
+        - name: Ejecución de despliegue a PRE
+          type: nolio.runDeployment
+        - name: Esperar por dependencia
+          type: xlrelease.GateTask
+        color: '#0099CC'
+      - phase: DESPLIEGUE A PRO
+        tasks:
+        - name: Ejecución de despliegue a PRO
+          type: nolio.runDeployment
+        color: '#991C71'
+      riskProfile: Default risk profile
+    - template: 4.5 Proporcionar mecanismos de marcha atrás de manera coordinada y
+        unitaria.
+      description: |-
+        This XL Release template shows the **Canary Deployment Pattern**
+
+        The Canary Release deployment pattern is a pattern where a small subset on your production environment is used to test out new features. The environment is split into a 'canary' part and a 'main' part. The canary part is typically small and allows for fast deployments. A load balancer is used to direct traffic to all parts of the application, deciding which users go to the new version in the canary section and which users remain on the stable main section.
+
+        For more information, please read [Perform canary deployments](https://docs.xebialabs.com/xl-release/how-to/perform-canary-deployments.html) on our documentation site.
+      scheduledStartDate: 2018-01-23T09:00:00+01:00
+      phases:
+      - phase: SELECCIÓN VERSIONES
+        tasks:
+        - name: Selección de versiones CSS implicadas en el despliegue
+          type: xlrelease.UserInputTask
+          description: Selección versión
+          owner: admin
+          variables:
+          - css
+          - css_actual
+        - name: Selección de versiones JAVASCRIPT implicadas en el despliegue
+          type: xlrelease.UserInputTask
+          description: Please enter the required information below.
+          owner: admin
+          variables:
+          - javascript
+          - javascript_actual
+        - name: Selección de versiones JAVA implicadas en el despliegue
+          type: xlrelease.UserInputTask
+          description: Please enter the required information below.
+          owner: admin
+          variables:
+          - java
+          - java_actual
+        color: '#0099CC'
+      - phase: DESPLIEGUE CSS
+        tasks:
+        - name: Componente CSS
+          type: xlrelease.SequentialGroup
+          owner: admin
+          tasks:
+          - name: Despliegue componente CSS ${css}
+            type: xlrelease.ScriptTask
+            description: |-
+              Use XL Deploy to deploy to the Canary environment.
+
+              Configure the XL Deploy server in **Settings > Shared Configuration**.
+            owner: admin
+            script: print("Despliegue")
+          - name: Registro despliegue CSS Ok
+            type: xlrelease.ScriptTask
+            owner: admin
+            script: releaseVariables['rollback_css'] = True
+          - name: Continuar despliegue componente JAVASCRIPT
+            type: xlrelease.UserInputTask
+            description: Please enter the required information below.
+            owner: admin
+            variables:
+            - actions
+        color: '#FD8D10'
+      - phase: DESPLIEGUE JAVASCRIPT
+        tasks:
+        - name: Componente JAVASCRIPT
+          type: xlrelease.SequentialGroup
+          owner: admin
+          precondition: releaseVariables['actions'] == 'Continuar despliegue'
+          tasks:
+          - name: Despliegue componente JAVASCRIPT ${javascript}
+            type: xlrelease.ScriptTask
+            description: |-
+              Use XL Deploy to deploy to the Canary environment.
+
+              Configure the XL Deploy server in **Settings > Shared Configuration**.
+            script: print("Despliegue")
+          - name: Registro despliegue JAVASCRIPT Ok
+            type: xlrelease.ScriptTask
+            script: releaseVariables['rollback_javascript'] = True
+          - name: Continuar despliegue componente JAVA
+            type: xlrelease.UserInputTask
+            description: Please enter the required information below.
+            variables:
+            - actions
+        color: '#08B153'
+      - phase: DESPLIEGUE JAVA
+        tasks:
+        - name: Componente JAVA
+          type: xlrelease.SequentialGroup
+          owner: admin
+          precondition: releaseVariables['actions'] == 'Continuar despliegue'
+          tasks:
+          - name: Despliegue componente JAVA ${java}
+            type: xlrelease.ScriptTask
+            description: |-
+              Use XL Deploy to deploy to the Canary environment.
+
+              Configure the XL Deploy server in **Settings > Shared Configuration**.
+            script: print("Despliegue")
+          - name: Registro despliegue JAVA Ok
+            type: xlrelease.ScriptTask
+            script: releaseVariables['rollback_java'] = True
+          - name: ¿Ejecutar Rollback de los cambios aplicados?
+            type: xlrelease.UserInputTask
+            description: Please enter the required information below.
+            variables:
+            - actions
+        color: '#991C71'
+      - phase: ROLLBACK
+        tasks:
+        - name: Tareas de Rollback
+          type: xlrelease.SequentialGroup
+          description: This block is executed only if tests failed and the Canary
+            environment needs to be rolled back.
+          owner: admin
+          precondition: releaseVariables['actions'] == 'Hacer rollback a la version
+            anterior'
+          tasks:
+          - name: Rollback JAVA a ${java_actual}
+            type: xlrelease.ScriptTask
+            description: Use XL Deploy to rollback the Canary environment to the original
+              version.
+            precondition: releaseVariables['rollback_java'] == True
+            script: print("Rollback")
+          - name: Rollback JAVASCRIPT a ${javascript_actual}
+            type: xlrelease.ScriptTask
+            description: Use XL Deploy to rollback the Canary environment to the original
+              version.
+            precondition: releaseVariables['rollback_javascript'] == True
+            script: print("Rollback")
+          - name: Rollback CSS a ${css_actual}
+            type: xlrelease.ScriptTask
+            description: Use XL Deploy to rollback the Canary environment to the original
+              version.
+            precondition: releaseVariables['rollback_css'] == True
+            script: print("Rollback")
+        color: '#08b153'
+      variables:
+      - type: xlrelease.StringVariable
+        key: css
+        requiresValue: false
+        showOnReleaseStart: false
+        label: Versión CSS
+        value: "1.1"
+      - type: xlrelease.StringVariable
+        key: javascript
+        requiresValue: false
+        showOnReleaseStart: false
+        label: Versión JAVASCRIPT
+        value: "2.1"
+      - type: xlrelease.StringVariable
+        key: java
+        requiresValue: false
+        showOnReleaseStart: false
+        label: Versión JAVA
+        value: "3.1"
+      - type: xlrelease.StringVariable
+        key: css_actual
+        requiresValue: false
+        showOnReleaseStart: false
+        label: Versión CSS actual
+        value: "1.0"
+      - type: xlrelease.StringVariable
+        key: javascript_actual
+        requiresValue: false
+        showOnReleaseStart: false
+        label: Versión JAVASCRIPT actual
+        value: "2.0"
+      - type: xlrelease.StringVariable
+        key: java_actual
+        requiresValue: false
+        showOnReleaseStart: false
+        label: Versión JAVA actual
+        value: "3.0"
+      - type: xlrelease.BooleanVariable
+        key: rollback_css
+        requiresValue: false
+        showOnReleaseStart: false
+      - type: xlrelease.BooleanVariable
+        key: rollback_javascript
+        requiresValue: false
+        showOnReleaseStart: false
+      - type: xlrelease.BooleanVariable
+        key: rollback_java
+        requiresValue: false
+        showOnReleaseStart: false
+      - type: xlrelease.StringVariable
+        key: actions
+        requiresValue: false
+        showOnReleaseStart: false
+        label: Acción
+        valueProvider:
+          type: xlrelease.ListOfStringValueProviderConfiguration
+          values:
+          - Continuar despliegue
+          - Hacer rollback a la version anterior
+        value: Continuar despliegue
+      scriptUsername: admin
+      scriptUserPassword: !value "xlrelease_Release_4_5_Proporcionar_mecanismos_de_marcha_atr_s_de_manera_coordinada_y_unitaria__scriptUserPassword"
+      riskProfile: Default risk profile
+    - template: 4.6 Proporcionar la automatización de la creación de releases desde
+        plantillas almacenadas en un Git.
+      scheduledStartDate: 2019-10-16T09:00:00+02:00
+      releaseTriggers:
+      - name: Creación de template y release desde plantillas almacenadas en Git
+        type: git.Poll
+        description: Creación de template y release desde plantillas almacenadas en
+          Git
+        releaseTitle: Release Bankinter - commitId = ${commitId}
+        gitRepository: jclopeza/bankinter
+        branch: master
+        commitId: 71bef74d530895adb3367d4dc829dda281378151
+      phases:
+      - phase: GENERACIÓN DE RELEASE
+        tasks:
+        - name: Creación de release
+          type: xlrelease.ExternalScriptTask
+          owner: admin
+          url: https://raw.githubusercontent.com/jclopeza/bankinter/master/XLRelease/Workshop/Bankinter/4.5%20Proporcionar%20mecanismos%20de%20marcha%20atr%C3%A1s%20de%20manera%20coordinada%20y%20unitaria..groovy
+        color: '#999999'
+      scriptUsername: admin
+      scriptUserPassword: !value "xlrelease_Release_4_6_Proporcionar_la_automatizaci_n_de_la_creaci_n_de_releases_desde_plantillas_almacenadas_en_un_Git__scriptUserPassword"
+      riskProfile: Default risk profile
+    - template: 4.7 Proporcionar mecanismos que tras ciertos eventos se ejecute una
+        fase, como por ejemplo que se disparase a partir de una aceptación o cambio
+        de estado en un issue de JIRA.
+      scheduledStartDate: 2019-10-17T09:00:00+02:00
+      phases:
+      - phase: DESARROLLO
+        tasks:
+        - name: Tarea Manual
+          type: xlrelease.Task
+          owner: admin
+        color: '#0099CC'
+      riskProfile: Default risk profile
+    - template: 4.8 Proporcionar mecanismos de notificaciones (email, por ejemplo).
+      scheduledStartDate: 2019-10-17T09:00:00+02:00
+      phases:
+      - phase: COMUNICACIONES
+        tasks:
+        - name: Envío de email
+          type: xlrelease.NotificationTask
+          addresses:
+          - destinatarios@gmail.com
+          subject: Envío de notificación de XL Release
+          body: |-
+            ## Dependencias satisfechas
+
+            El microservicio `MS1` está **pendiente de aprobación** para progresar al siguiente entorno.
+
+            ### Todas las dependendencias han sido satisfechas.
+        - name: Asignación de tarea a un usuario
+          type: xlrelease.Task
+          owner: ahortalq
+        - name: Asignación de tarea a un grupo
+          type: xlrelease.Task
+          team: Operaciones
+        color: '#0099CC'
+      riskProfile: Default risk profile
+    - template: 4.9 Permitir definir y controlar el flujo de paso entre entornos al
+        desarrollador (el despliegue lo inicia un desarrollador y el OK lo da el jefe
+        de proyecto)
+      scheduledStartDate: 2019-10-17T09:00:00+02:00
+      phases:
+      - phase: BUILD
+        color: '#D94C3D'
+      - phase: TEST
+        color: '#0099CC'
+      - phase: PREPRODUCCIÓN
+        tasks:
+        - name: Completar para iniciar el despliegue en PRE
+          type: xlrelease.Task
+          team: Desarrollo
+        - name: Despliegue en PRE
+          type: nolio.runDeployment
+        - name: Autorización de jefe de proyecto
+          type: xlrelease.GateTask
+          team: Jefe de Proyecto
+        color: '#FD8D10'
+      - phase: PRODUCCIÓN
+        color: '#991C71'
+      riskProfile: Default risk profile
+    - name: Deployments
+      type: xlrelease.DeploymentsByStageDashboard
+      owner: admin
+      tiles:
+      - type: xlrelease.PlaceholderTile
+        row: 0
+        col: 0
+        content: Development
+      - name: Current applications
+        type: deployment.CurrentApplicationsTile
+        width: 1
+        height: 1
+        row: 1
+        col: 0
+        filters:
+        - type: xlrelease.EnvironmentStageFilter
+          stage: Development
+        - type: xlrelease.FolderFilter
+          folderId: Folder0c3ec44ba3194f6d932dc97005e007c5
+        - type: xlrelease.DateFilter
+          timeFrame: LAST_MONTH
+      - name: Activity
+        type: deployment.DeploymentsActivityTile
+        width: 1
+        row: 2
+        col: 0
+        filters:
+        - type: xlrelease.EnvironmentStageFilter
+          stage: Development
+        - type: xlrelease.FolderFilter
+          folderId: Folder0c3ec44ba3194f6d932dc97005e007c5
+        - type: xlrelease.DateFilter
+          timeFrame: LAST_MONTH
+      - name: Total deployments
+        type: deployment.TotalDeploymentsTile
+        width: 1
+        height: 1
+        row: 4
+        col: 0
+        filters:
+        - type: xlrelease.EnvironmentStageFilter
+          stage: Development
+        - type: xlrelease.FolderFilter
+          folderId: Folder0c3ec44ba3194f6d932dc97005e007c5
+        - type: xlrelease.DateFilter
+          timeFrame: LAST_MONTH
+      - name: Deployments
+        type: deployment.DeploymentsDistributionTile
+        width: 1
+        row: 5
+        col: 0
+        filters:
+        - type: xlrelease.EnvironmentStageFilter
+          stage: Development
+        - type: xlrelease.FolderFilter
+          folderId: Folder0c3ec44ba3194f6d932dc97005e007c5
+        - type: xlrelease.DateFilter
+          timeFrame: LAST_MONTH
+        height: 1
+      - name: Deployment success rate
+        type: deployment.DeploymentsSuccessRateTile
+        width: 1
+        height: 1
+        row: 6
+        col: 0
+        filters:
+        - type: xlrelease.EnvironmentStageFilter
+          stage: Development
+        - type: xlrelease.FolderFilter
+          folderId: Folder0c3ec44ba3194f6d932dc97005e007c5
+        - type: xlrelease.DateFilter
+          timeFrame: LAST_MONTH
+      - type: xlrelease.PlaceholderTile
+        row: 0
+        col: 1
+        content: Preproduction
+      - name: Current applications
+        type: deployment.CurrentApplicationsTile
+        width: 1
+        height: 1
+        row: 1
+        col: 1
+        filters:
+        - type: xlrelease.EnvironmentStageFilter
+          stage: Preproduction
+        - type: xlrelease.FolderFilter
+          folderId: Folder0c3ec44ba3194f6d932dc97005e007c5
+        - type: xlrelease.DateFilter
+          timeFrame: LAST_MONTH
+      - name: Activity
+        type: deployment.DeploymentsActivityTile
+        width: 1
+        row: 2
+        col: 1
+        filters:
+        - type: xlrelease.EnvironmentStageFilter
+          stage: Preproduction
+        - type: xlrelease.FolderFilter
+          folderId: Folder0c3ec44ba3194f6d932dc97005e007c5
+        - type: xlrelease.DateFilter
+          timeFrame: LAST_MONTH
+      - name: Total deployments
+        type: deployment.TotalDeploymentsTile
+        width: 1
+        height: 1
+        row: 4
+        col: 1
+        filters:
+        - type: xlrelease.EnvironmentStageFilter
+          stage: Preproduction
+        - type: xlrelease.FolderFilter
+          folderId: Folder0c3ec44ba3194f6d932dc97005e007c5
+        - type: xlrelease.DateFilter
+          timeFrame: LAST_MONTH
+      - name: Deployments
+        type: deployment.DeploymentsDistributionTile
+        width: 1
+        row: 5
+        col: 1
+        filters:
+        - type: xlrelease.EnvironmentStageFilter
+          stage: Preproduction
+        - type: xlrelease.FolderFilter
+          folderId: Folder0c3ec44ba3194f6d932dc97005e007c5
+        - type: xlrelease.DateFilter
+          timeFrame: LAST_MONTH
+        height: 1
+      - name: Deployment success rate
+        type: deployment.DeploymentsSuccessRateTile
+        width: 1
+        height: 1
+        row: 6
+        col: 1
+        filters:
+        - type: xlrelease.EnvironmentStageFilter
+          stage: Preproduction
+        - type: xlrelease.FolderFilter
+          folderId: Folder0c3ec44ba3194f6d932dc97005e007c5
+        - type: xlrelease.DateFilter
+          timeFrame: LAST_MONTH
+      - type: xlrelease.PlaceholderTile
+        row: 0
+        col: 2
+        content: Production
+      - name: Current applications
+        type: deployment.CurrentApplicationsTile
+        width: 1
+        height: 1
+        row: 1
+        col: 2
+        filters:
+        - type: xlrelease.EnvironmentStageFilter
+          stage: Production
+        - type: xlrelease.FolderFilter
+          folderId: Folder0c3ec44ba3194f6d932dc97005e007c5
+        - type: xlrelease.DateFilter
+          timeFrame: LAST_MONTH
+      - name: Activity
+        type: deployment.DeploymentsActivityTile
+        width: 1
+        row: 2
+        col: 2
+        filters:
+        - type: xlrelease.EnvironmentStageFilter
+          stage: Production
+        - type: xlrelease.FolderFilter
+          folderId: Folder0c3ec44ba3194f6d932dc97005e007c5
+        - type: xlrelease.DateFilter
+          timeFrame: LAST_MONTH
+      - name: Total deployments
+        type: deployment.TotalDeploymentsTile
+        width: 1
+        height: 1
+        row: 4
+        col: 2
+        filters:
+        - type: xlrelease.EnvironmentStageFilter
+          stage: Production
+        - type: xlrelease.FolderFilter
+          folderId: Folder0c3ec44ba3194f6d932dc97005e007c5
+        - type: xlrelease.DateFilter
+          timeFrame: LAST_MONTH
+      - name: Deployments
+        type: deployment.DeploymentsDistributionTile
+        width: 1
+        row: 5
+        col: 2
+        filters:
+        - type: xlrelease.EnvironmentStageFilter
+          stage: Production
+        - type: xlrelease.FolderFilter
+          folderId: Folder0c3ec44ba3194f6d932dc97005e007c5
+        - type: xlrelease.DateFilter
+          timeFrame: LAST_MONTH
+        height: 1
+      - name: Deployment success rate
+        type: deployment.DeploymentsSuccessRateTile
+        width: 1
+        height: 1
+        row: 6
+        col: 2
+        filters:
+        - type: xlrelease.EnvironmentStageFilter
+          stage: Production
+        - type: xlrelease.FolderFilter
+          folderId: Folder0c3ec44ba3194f6d932dc97005e007c5
+        - type: xlrelease.DateFilter
+          timeFrame: LAST_MONTH
+      columns: 3
+      filters:
+      - type: xlrelease.FolderFilter
+        folderId: Folder0c3ec44ba3194f6d932dc97005e007c5
+      - type: xlrelease.DateFilter
+        timeFrame: LAST_MONTH
+    - type: xlrelease.Dashboard
+      tiles:
+      - name: Release progress
+        type: xlrelease.ReleaseProgressTile
+      - name: Release summary
+        type: xlrelease.ReleaseSummaryTile
+      - name: Resource usage
+        type: xlrelease.ResourceUsageTile
+      - name: Release timeline
+        type: xlrelease.TimelineTile
+      - name: Release health
+        type: xlrelease.ReleaseHealthTile
+      parentTemplate: 4.1 Permitir al desarrollador generar paquetes de artefactos
+        de distintas tipologías (java, javascript, cobol, css, .pck ..) y coordinar
+        su despliegue.
+    - type: xlrelease.Dashboard
+      tiles:
+      - name: Release progress
+        type: xlrelease.ReleaseProgressTile
+      - name: Release summary
+        type: xlrelease.ReleaseSummaryTile
+      - name: Resource usage
+        type: xlrelease.ResourceUsageTile
+      - name: Release timeline
+        type: xlrelease.TimelineTile
+      - name: Release health
+        type: xlrelease.ReleaseHealthTile
+      parentTemplate: 4.10 Validación de que el usuario está autorizado a desplegar
+        - posible integración con RA
+    - type: xlrelease.Dashboard
+      tiles:
+      - name: Release progress
+        type: xlrelease.ReleaseProgressTile
+      - name: Release summary
+        type: xlrelease.ReleaseSummaryTile
+      - name: Resource usage
+        type: xlrelease.ResourceUsageTile
+      - name: Release timeline
+        type: xlrelease.TimelineTile
+      - name: Release health
+        type: xlrelease.ReleaseHealthTile
+      parentTemplate: 4.11 Validación del estado del artefacto antes de desplegar
+        (por ejemplo si está deprecado que no lo permita)
+    - type: xlrelease.Dashboard
+      tiles:
+      - name: Release progress
+        type: xlrelease.ReleaseProgressTile
+      - name: Release summary
+        type: xlrelease.ReleaseSummaryTile
+      - name: Resource usage
+        type: xlrelease.ResourceUsageTile
+      - name: Release timeline
+        type: xlrelease.TimelineTile
+      - name: Release health
+        type: xlrelease.ReleaseHealthTile
+      parentTemplate: 4.2 Permitir establecer dependencias de despliegue entre los
+        paquetes o componentes unitarios. (1)
+    - type: xlrelease.Dashboard
+      tiles:
+      - name: Release progress
+        type: xlrelease.ReleaseProgressTile
+      - name: Release summary
+        type: xlrelease.ReleaseSummaryTile
+      - name: Resource usage
+        type: xlrelease.ResourceUsageTile
+      - name: Release timeline
+        type: xlrelease.TimelineTile
+      - name: Release health
+        type: xlrelease.ReleaseHealthTile
+      parentTemplate: 4.2 Permitir establecer dependencias de despliegue entre los
+        paquetes o componentes unitarios. (2)
+    - type: xlrelease.Dashboard
+      tiles:
+      - name: Release progress
+        type: xlrelease.ReleaseProgressTile
+      - name: Release summary
+        type: xlrelease.ReleaseSummaryTile
+      - name: Resource usage
+        type: xlrelease.ResourceUsageTile
+      - name: Release timeline
+        type: xlrelease.TimelineTile
+      - name: Release health
+        type: xlrelease.ReleaseHealthTile
+      parentTemplate: 4.2 Permitir establecer dependencias de despliegue entre los
+        paquetes o componentes unitarios. (3)
+    - type: xlrelease.Dashboard
+      tiles:
+      - name: Release progress
+        type: xlrelease.ReleaseProgressTile
+      - name: Release summary
+        type: xlrelease.ReleaseSummaryTile
+      - name: Resource usage
+        type: xlrelease.ResourceUsageTile
+      - name: Release timeline
+        type: xlrelease.TimelineTile
+      - name: Release health
+        type: xlrelease.ReleaseHealthTile
+      parentTemplate: 4.3 Permitir conocer en todo momento las versiones de los artefactos
+        de cada entorno.
+    - type: xlrelease.Dashboard
+      tiles:
+      - name: Release progress
+        type: xlrelease.ReleaseProgressTile
+      - name: Release summary
+        type: xlrelease.ReleaseSummaryTile
+      - name: Resource usage
+        type: xlrelease.ResourceUsageTile
+      - name: Release timeline
+        type: xlrelease.TimelineTile
+      - name: Release health
+        type: xlrelease.ReleaseHealthTile
+      parentTemplate: 4.4 Un paquete puede permanecer en un determinado entorno el
+        tiempo que sea necesario.
+    - type: xlrelease.Dashboard
+      tiles:
+      - name: Release progress
+        type: xlrelease.ReleaseProgressTile
+      - name: Release summary
+        type: xlrelease.ReleaseSummaryTile
+      - name: Resource usage
+        type: xlrelease.ResourceUsageTile
+      - name: Release timeline
+        type: xlrelease.TimelineTile
+      - name: Release health
+        type: xlrelease.ReleaseHealthTile
+      parentTemplate: 4.5 Proporcionar mecanismos de marcha atrás de manera coordinada
+        y unitaria.
+    - type: xlrelease.Dashboard
+      tiles:
+      - name: Release progress
+        type: xlrelease.ReleaseProgressTile
+      - name: Release summary
+        type: xlrelease.ReleaseSummaryTile
+      - name: Resource usage
+        type: xlrelease.ResourceUsageTile
+      - name: Release timeline
+        type: xlrelease.TimelineTile
+      - name: Release health
+        type: xlrelease.ReleaseHealthTile
+      parentTemplate: 4.6 Proporcionar la automatización de la creación de releases
+        desde plantillas almacenadas en un Git.
+    - type: xlrelease.Dashboard
+      tiles:
+      - name: Release progress
+        type: xlrelease.ReleaseProgressTile
+      - name: Release summary
+        type: xlrelease.ReleaseSummaryTile
+      - name: Resource usage
+        type: xlrelease.ResourceUsageTile
+      - name: Release timeline
+        type: xlrelease.TimelineTile
+      - name: Release health
+        type: xlrelease.ReleaseHealthTile
+      parentTemplate: 4.7 Proporcionar mecanismos que tras ciertos eventos se ejecute
+        una fase, como por ejemplo que se disparase a partir de una aceptación o cambio
+        de estado en un issue de JIRA.
+    - type: xlrelease.Dashboard
+      tiles:
+      - name: Release progress
+        type: xlrelease.ReleaseProgressTile
+      - name: Release summary
+        type: xlrelease.ReleaseSummaryTile
+      - name: Resource usage
+        type: xlrelease.ResourceUsageTile
+      - name: Release timeline
+        type: xlrelease.TimelineTile
+      - name: Release health
+        type: xlrelease.ReleaseHealthTile
+      parentTemplate: 4.8 Proporcionar mecanismos de notificaciones (email, por ejemplo).
+    - type: xlrelease.Dashboard
+      tiles:
+      - name: Release progress
+        type: xlrelease.ReleaseProgressTile
+      - name: Release summary
+        type: xlrelease.ReleaseSummaryTile
+      - name: Resource usage
+        type: xlrelease.ResourceUsageTile
+      - name: Release timeline
+        type: xlrelease.TimelineTile
+      - name: Release health
+        type: xlrelease.ReleaseHealthTile
+      parentTemplate: 4.9 Permitir definir y controlar el flujo de paso entre entornos
+        al desarrollador (el despliegue lo inicia un desarrollador y el OK lo da el
+        jefe de proyecto)

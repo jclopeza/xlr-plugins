@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<synthetic xsi:schemaLocation="http://www.xebialabs.com/deployit/synthetic synthetic.xsd" xmlns="http://www.xebialabs.com/deployit/synthetic" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+    <type type="artifactoryValueProvider.ArtifactoryServer" extends="configuration.HttpConnection">
+        <property name="version" default="6.13.1"/>
+    </type>
+    <type type="artifactoryValueProvider.GetRepositories" extends="xlrelease.JythonProvider" label="Artifactory Repository Provider" description="This value provider returns repositories from Artifactory">
+        <property name="artifactoryServer" label="Artifactory Server" referenced-type="artifactoryValueProvider.ArtifactoryServer" kind="ci" description="Artifactory server to use"/>
+        <property name="endPoint" label="Endpoint" default ="/api/repositories" required="true"/>
+    </type>
+    <type type="artifactoryValueProvider.GetVersions" extends="xlrelease.JythonProvider" label="Artifactory Version Provider" description="This value provider returns versions from Artifactory">
+        <property name="artifactoryServer" label="Artifactory Server" referenced-type="artifactoryValueProvider.ArtifactoryServer" kind="ci" description="Artifactory server to use"/>
+    </type>
+
+</synthetic>
