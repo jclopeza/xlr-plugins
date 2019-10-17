@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<synthetic xsi:schemaLocation="http://www.xebialabs.com/deployit/synthetic synthetic.xsd" xmlns="http://www.xebialabs.com/deployit/synthetic" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+    <type type="dependencies.GetDependencies" extends="xlrelease.PythonScript">
+        <property name="scriptLocation" default="dependencies/GetDependencies.py" hidden="true"/>
+        <property name="iconLocation" default="dependencies/dependencies.png" hidden="true"/>
+        <property name="taskColor" hidden="true" default="#1C1030" />
+        <property name="user" category="input" label="User" default="admin" required="true"/>
+        <property name="password" category="input" label="Password" password="true" required="true"/>
+        <property name="phaseName" category="input" label="Phase Name" required="true"/>
+        <property name="dependencies" category="input" label="Dependencies" kind="map_string_string" required="true"/>
+        <property name="listIdsDependentPhases" kind="list_of_string" category="output"/>
+    </type>
+
+    <type type="dependencies.SetDependencies" extends="xlrelease.PythonScript">
+        <property name="scriptLocation" default="dependencies/SetDependencies.py" hidden="true"/>
+        <property name="iconLocation" default="dependencies/dependencies.png" hidden="true"/>
+        <property name="taskColor" hidden="true" default="#032704" />
+        <property name="user" category="input" label="User" default="admin" required="true"/>
+        <property name="password" category="input" label="Password" password="true" required="true"/>
+        <property name="releaseId" hidden="true" category="input" default="${release.id}" required="true"/>
+        <property name="phaseName" category="input" label="Phase Name" required="true"/>
+        <property name="taskName" category="input" label="Task Name" required="true"/>
+        <property name="listIdsDependentPhases" category="input" kind="list_of_string" label="Ids Dependent Phases" required="true"/>
+    </type>
+
+</synthetic>

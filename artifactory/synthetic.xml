@@ -1,0 +1,20 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<synthetic xsi:schemaLocation="http://www.xebialabs.com/deployit/synthetic synthetic.xsd" xmlns="http://www.xebialabs.com/deployit/synthetic" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+    <type type="artifactory.ArtifactoryServer" extends="configuration.HttpConnection">
+        <property name="version" default="6.11"/>
+    </type>
+    <type type="artifactory.ArtifactoryQuery" extends="xlrelease.PythonScript">
+        <property name="scriptLocation" default="artifactory/ArtifactoryQuery.py" hidden="true"/>
+        <property name="iconLocation" default="artifactory/artifactory.png" hidden="true"/>
+        <property name="artifactoryServer" category="input" label="Server" referenced-type="artifactory.ArtifactoryServer" kind="ci" required="true"/>
+        <property name="endPoint" category="input" label="Endpoint" default ="/service/rest/v1/repositories" required="true"/>
+
+        <property name="listArtifacts" category="output"/>
+    </type>
+
+    <type type="test.TestValueProvider" extends="xlrelease.JythonProvider" label="Artifactory repositories"
+          description="Repositories availables">
+    </type>
+
+</synthetic>
