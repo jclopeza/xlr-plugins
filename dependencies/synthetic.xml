@@ -8,7 +8,7 @@
         <property name="user" category="input" label="User" default="admin" required="true"/>
         <property name="password" category="input" label="Password" password="true" required="true"/>
         <property name="phaseName" category="input" label="Phase Name" required="true"/>
-        <property name="dependencies" category="input" label="Dependencies" kind="map_string_string" required="true"/>
+        <property name="dependencies" category="input" label="Dependencies" kind="list_of_string" required="true"/>
         <property name="listIdsDependentPhases" kind="list_of_string" category="output"/>
     </type>
 

@@ -1,4 +1,5 @@
 import urllib2
+import urllib
 import json
 import base64
 import time
@@ -7,10 +8,10 @@ import sys
 base64string = base64.b64encode("{0}:{1}".format(user, password))
 
 id_dependencies = []
-for key, val in dependencies.items():
-    print("key = {0}".format(key))
-    print("val = {0}".format(val))
-    url = "http://localhost:5516/api/v1/releases/byTitle?releaseTitle={0}%20{1}".format(key, val)
+for dep in dependencies:
+    dep = urllib.quote(dep)
+    print("dep = {0}".format(dep))
+    url = "http://localhost:5516/api/v1/releases/byTitle?releaseTitle={0}".format(dep)
     req = urllib2.Request(url)
     req.add_header("Authorization", "Basic %s" % base64string)
     req.add_header('Content-Type','application/json')
@@ -18,7 +19,7 @@ for key, val in dependencies.items():
     while not microserviceFound:
         response = urllib2.urlopen(req)
         data = json.load(response)
-        print("Total de registros para microservicio {0} en version {1} = {2}".format(key, val, len(data)))
+        print("Total de registros para microservicio {0} = {1}".format(dep, len(data)))
         if len(data) > 0:
             microserviceFound = True
             # Ahora debemos obtener el ID de la release
