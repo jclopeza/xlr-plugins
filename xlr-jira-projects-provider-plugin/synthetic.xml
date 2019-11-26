@@ -3,7 +3,11 @@
 
     <type type="jiraProjectValueProvider.GetProjects" extends="xlrelease.JythonProvider" label="Jira Projects Provider" description="This value provider returns projects from Jira">
         <property name="jiraServer" label="Jira Server" referenced-type="jira.Server" kind="ci" description="Jira server to use"/>
-        <property name="endPoint" label="Endpoint" default ="/rest/api/2/project" required="true" hidden="true" />
+    </type>
+
+    <type type="jiraComponentValueProvider.GetComponents" extends="xlrelease.JythonProvider" label="Jira Components Provider" description="This value provider returns components from a Jira project">
+        <property name="jiraServer" label="Jira Server" referenced-type="jira.Server" kind="ci" description="Jira server to use"/>
+        <property name="project" label="Project" required="true" />
     </type>
 
 </synthetic>
