@@ -5,4 +5,4 @@ response = request.get(valueProvider.endPoint, contentType = 'application/json')
 data = json.loads(response.getResponse())
 result = []
 for repository in data:
-    result = result + [repository['key']]
+    result = result + [repository['name']]
